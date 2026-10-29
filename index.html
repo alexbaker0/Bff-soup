@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Random 64-byte BFF programs interact in a primordial soup until self-replicators emerge. An in-browser version of the Computational Life experiment.">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>BFF Primordial Soup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a lab bench. The soup is the specimen on the left; instruments (controls, traces, inspector) sit in a column on the right. Reference card below. */
+:root {
+  --bg: #eceff3;
+  --surface: #f9fafb;
+  --ink: #10141a;
+  --muted: #586172;
+  --line: #d3d9e1;
+  --chip: #e1e6ec;
+  --accent: #0b7f63;
+  --accent-ink: #ffffff;
+  --alert: #b4235a;
+  --stage: #0a0c11;
+  --stage-line: #1f2530;
+  --trace-hoe: #0b7f63;
+  --trace-ops: #6d4fd8;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0e13; --surface: #12171f; --ink: #e4e8ee; --muted: #8b95a6; --line: #232a35;
+    --chip: #1b212b; --accent: #3fcf9f; --accent-ink: #05140e; --alert: #ff7aa2;
+    --stage: #06080b; --stage-line: #1d232d; --trace-hoe: #3fcf9f; --trace-ops: #a58bff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0e13; --surface: #12171f; --ink: #e4e8ee; --muted: #8b95a6; --line: #232a35;
+  --chip: #1b212b; --accent: #3fcf9f; --accent-ink: #05140e; --alert: #ff7aa2;
+  --stage: #06080b; --stage-line: #1d232d; --trace-hoe: #3fcf9f; --trace-ops: #a58bff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+header.top h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 3.4vw, 38px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+header.top h1 span { color: var(--accent); }
+header.top p { margin: 6px 0 0; color: var(--muted); max-width: 64ch; }
+.status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--chip); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.alive { background: var(--accent); color: var(--accent-ink); }
+.status.alive .dot { background: var(--accent-ink); }
+.status.running .dot { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .status.running .dot { animation: none; } }
+
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+@media (max-width: 980px) { .lab { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dish { position: relative; background: var(--stage); border: 1px solid var(--stage-line); border-radius: var(--radius); padding: 10px; }
+.dish canvas#soup { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; }
+.dish .canvas-holder { position: relative; }
+#marker { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 1px #000; pointer-events: none; min-width: 6px; min-height: 6px; }
+.dish .caption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; color: #8d97a8; font-size: 12px; margin-top: 8px; font-family: var(--font-mono); }
+
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--surface); padding: 10px 12px; min-width: 0; }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.stat .v { font-family: var(--font-mono); font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h2 { font-family: var(--font-display); font-weight: 500; font-size: 16px; margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card h2 small { font-family: var(--font-body); font-size: 12px; color: var(--muted); font-weight: 400; }
+.buttons { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; }
+button { font: inherit; font-weight: 500; border-radius: 5px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); padding: 8px 10px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.ghost { background: transparent; }
+button:disabled { opacity: .5; cursor: default; }
+.field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 8px; }
+.field label { font-size: 13px; color: var(--muted); }
+select, input[type=number] { font: inherit; font-family: var(--font-mono); font-size: 13px; width: 100%; padding: 6px 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; }
+.seedrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.seedrow button { padding: 6px 10px; font-size: 13px; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.note strong { color: var(--ink); font-weight: 500; }
+
+.trace { display: flex; flex-direction: column; gap: 4px; }
+.trace .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.trace .lbl b { font-family: var(--font-mono); font-weight: 500; color: var(--ink); }
+.trace canvas { width: 100%; height: 96px; display: block; }
+
+.insp-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; font-family: var(--font-mono); font-size: 13px; }
+.insp-grid div { aspect-ratio: 1; display: grid; place-items: center; border-radius: 2px; color: #0a0c11; font-weight: 500; max-width: 100%; }
+.insp-grid div.noise { color: #8d97a8; font-weight: 400; }
+.insp-grid div.head { outline: 2px solid var(--ink); outline-offset: -2px; }
+.code { font-family: var(--font-mono); font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 8px; overflow-x: auto; white-space: pre; }
+.empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.row-actions button { font-size: 12px; padding: 5px 9px; }
+
+.species { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.species li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px; border-radius: 5px; cursor: pointer; border: 1px solid transparent; }
+.species li:hover, .species li:focus-visible { border-color: var(--line); background: var(--bg); outline: none; }
+.species canvas { width: 32px; height: 32px; image-rendering: pixelated; border-radius: 2px; }
+.species .s { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.species .c { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+
+.ref { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 860px) { .ref { grid-template-columns: minmax(0, 1fr); } }
+.ref h2 { font-family: var(--font-display); font-weight: 500; font-size: 18px; margin: 0 0 8px; }
+.ops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+@media (max-width: 480px) { .ops { grid-template-columns: minmax(0, 1fr); } }
+.op { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; }
+.op .sw { width: 28px; height: 28px; border-radius: 3px; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 500; color: #0a0c11; }
+.op code { font-family: var(--font-mono); font-size: 12px; }
+.howto ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 62ch; }
+.howto p { margin: 10px 0 0; max-width: 62ch; color: var(--muted); }
+a { color: var(--accent); }
+.foot { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>BFF <span>Primordial</span> Soup</h1>
+      <p>Random 64-byte programs meet in pairs, run as one tape, and split again. Nobody writes a replicator. With enough interactions, one usually appears and takes over the soup.</p>
+    </div>
+    <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">Pre-life soup</span></div>
+  </header>
+
+  <div class="lab">
+    <section class="stage" aria-label="Soup">
+      <div class="dish">
+        <div class="canvas-holder">
+          <canvas id="soup" width="1024" height="1024" aria-label="Soup of programs, one 8 by 8 block per program"></canvas>
+          <div id="marker" hidden></div>
+        </div>
+        <div class="caption"><span id="capLayout">128 × 128 programs · each 8×8 block is one program, each pixel one byte</span><span>click a block to inspect it</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Epoch</div><div class="v" id="sEpoch">0</div></div>
+        <div class="stat"><div class="k">Interactions</div><div class="v" id="sInter">0</div></div>
+        <div class="stat"><div class="k">Epochs / sec</div><div class="v" id="sRate">–</div></div>
+        <div class="stat"><div class="k">Instr. / interaction</div><div class="v" id="sOps">–</div></div>
+        <div class="stat"><div class="k">High-order entropy</div><div class="v" id="sHoe">–</div></div>
+        <div class="stat"><div class="k">Top program share</div><div class="v" id="sTop">–</div></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="card">
+        <div class="buttons">
+          <button class="primary" id="btnRun">Run</button>
+          <button id="btnStep">Step</button>
+          <button id="btnReset">Reset</button>
+        </div>
+        <div class="field">
+          <label for="selSoup">Soup</label>
+          <select id="selSoup">
+            <optgroup label="Well-mixed (any pair can meet)">
+              <option value="mixed:64:64">4,096 programs</option>
+              <option value="mixed:128:128">16,384 programs</option>
+              <option value="mixed:256:256">65,536 programs</option>
+              <option value="mixed:512:256">131,072 programs (paper)</option>
+            </optgroup>
+            <optgroup label="2D grid (neighbours within 2 cells)">
+              <option value="grid:120:68">120 × 68 grid</option>
+              <option value="grid:240:135">240 × 135 grid (paper)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field">
+          <label for="inSeed">Seed</label>
+          <div class="seedrow">
+            <input type="number" id="inSeed" min="0" max="4294967295" step="1" value="1">
+            <button id="btnDice" class="ghost" title="Pick a random seed">New seed</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="selMut">Mutation</label>
+          <select id="selMut">
+            <option value="0">None</option>
+            <option value="0.00012207">0.012% per byte</option>
+            <option value="0.00024414" selected>0.024% per byte (paper)</option>
+            <option value="0.001">0.1% per byte</option>
+          </select>
+        </div>
+        <p class="note" id="threadNote">Starting workers…</p>
+        <p class="note" id="hint"></p>
+        <div class="row-actions">
+          <button id="btnPlant" class="ghost">Inoculate with evolved replicators</button>
+        </div>
+        <p class="note">Skips the wait: replaces 2% of the soup (or a 9 × 9 patch of the grid) with programs taken from a soup where replicators had already emerged. Takeover usually follows within a few hundred epochs.</p>
+      </div>
+
+      <div class="card">
+        <h2>Traces <small id="traceRange">epoch 0</small></h2>
+        <div class="trace">
+          <div class="lbl"><span>High-order entropy, bits per byte</span><b id="tHoe">–</b></div>
+          <canvas id="chHoe" aria-label="High-order entropy over epochs"></canvas>
+        </div>
+        <div class="trace">
+          <div class="lbl"><span>Instructions per interaction (log scale)</span><b id="tOps">–</b></div>
+          <canvas id="chOps" aria-label="Instructions per interaction over epochs"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Inspector <small id="inspTitle">no program selected</small></h2>
+        <div id="inspBody"><div class="empty">Click any block in the soup, or a row in the list below, to see its 64 bytes. The view follows that slot as the soup changes.</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Most common programs <small id="specNote">exact copies</small></h2>
+        <ul class="species" id="species"><li class="empty" style="cursor:default">Counted once a second while running.</li></ul>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card ref" aria-label="Reference">
+    <div>
+      <h2>The ten instructions</h2>
+      <div class="ops" id="opsList"></div>
+      <p class="note" style="margin-top:10px">Every other byte value is data and does nothing when executed. Zero matters because <code>[</code> and <code>]</code> test for it.</p>
+    </div>
+    <div class="howto">
+      <h2>One epoch</h2>
+      <ol>
+        <li>Each byte in the soup has a 1 in 4,096 chance of being replaced with a random byte (at the paper's rate).</li>
+        <li>Programs are paired at random (or with a nearby neighbour on the 2D grid). Each pair is joined into a 128-byte tape, A then B.</li>
+        <li>The tape runs from byte 0 for up to 8,192 steps, with both heads starting at 0. Code and data share the tape, so a program can rewrite itself and its partner.</li>
+        <li>The tape is cut back into two 64-byte programs and returned to the soup.</li>
+      </ol>
+      <p>Watch for the moment the instruction count jumps and the high-order entropy rises: copies are now outcompeting noise. The timing is random. In the paper, about 40% of runs with 131,072 programs got there within 16,000 epochs; smaller soups and unlucky seeds can take much longer, so try a few seeds.</p>
+      <p class="foot">Based on Agüera y Arcas et al., <a href="https://arxiv.org/abs/2406.19108" target="_blank" rel="noopener">Computational Life</a> (2024). The interpreter follows the <code>bff_noheads</code> variant in Google's <a href="https://github.com/paradigms-of-intelligence/cubff" target="_blank" rel="noopener">cubff</a>. Entropy here uses deflate rather than brotli, so values differ a little from the paper's.</p>
+    </div>
+  </section>
+</div>
+
+<script id="core">
+/* ===== BFF core (shared by page and workers) ===== */
+const BFF_OP = new Uint8Array(256);
+BFF_OP[60]=1; BFF_OP[62]=2; BFF_OP[123]=3; BFF_OP[125]=4; BFF_OP[43]=5;
+BFF_OP[45]=6; BFF_OP[46]=7; BFF_OP[44]=8; BFF_OP[91]=9; BFF_OP[93]=10;
+
+/* Runs one 128-byte tape in place (cubff bff_noheads semantics).
+   Returns the number of instructions executed (no-ops excluded). */
+function bffRun(t, off, maxSteps) {
+  const OP = BFF_OP;
+  let pos = 0, h0 = 0, h1 = 0, steps = 0, ops = 0;
+  while (steps < maxSteps) {
+    const o = OP[t[off + pos]];
+    steps++;
+    if (o !== 0) {
+      ops++;
+      switch (o) {
+        case 1: h0 = (h0 - 1) & 127; break;
+        case 2: h0 = (h0 + 1) & 127; break;
+        case 3: h1 = (h1 - 1) & 127; break;
+        case 4: h1 = (h1 + 1) & 127; break;
+        case 5: t[off + h0] = (t[off + h0] + 1) & 255; break;
+        case 6: t[off + h0] = (t[off + h0] - 1) & 255; break;
+        case 7: t[off + h1] = t[off + h0]; break;
+        case 8: t[off + h0] = t[off + h1]; break;
+        case 9:
+          if (t[off + h0] === 0) {
+            let d = 1, p = pos + 1;
+            while (p < 128) { const x = t[off + p]; if (x === 91) d++; else if (x === 93 && --d === 0) break; p++; }
+            if (d !== 0) return ops;
+            pos = p;
+          }
+          break;
+        case 10:
+          if (t[off + h0] !== 0) {
+            let d = 1, p = pos - 1;
+            while (p >= 0) { const x = t[off + p]; if (x === 93) d++; else if (x === 91 && --d === 0) break; p--; }
+            if (d !== 0) return ops;
+            pos = p;
+          }
+          break;
+      }
+    }
+    pos++;
+    if (pos >= 128) break;
+  }
+  return ops;
+}
+
+/* sfc32 PRNG seeded from an integer */
+function makeRng(seed) {
+  let a = 0x9E3779B9, b = 0x243F6A88, c = 0xB7E15162, d = (seed >>> 0) ^ 0xDEADBEEF;
+  const next = () => {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+    let t = (a + b) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0;
+    c = (c << 21) | (c >>> 11); d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0;
+    return (t >>> 0) / 4294967296;
+  };
+  for (let i = 0; i < 20; i++) next();
+  return next;
+}
+
+function initSoup(n, rng) {
+  const s = new Uint8Array(n * 64);
+  for (let i = 0; i < s.length; i++) s[i] = (rng() * 256) | 0;
+  return s;
+}
+
+/* Random byte replacement at rate p per byte (geometric skipping). */
+function mutateSoup(soup, p, rng) {
+  if (p <= 0) return 0;
+  const lq = Math.log(1 - p), n = soup.length; let count = 0;
+  let i = Math.floor(Math.log(1 - rng()) / lq);
+  while (i < n) { soup[i] = (rng() * 256) | 0; count++; i += 1 + Math.floor(Math.log(1 - rng()) / lq); }
+  return count;
+}
+
+function pairMixed(n, rng, perm, pairs) {
+  for (let i = 0; i < n; i++) perm[i] = i;
+  for (let i = n - 1; i > 0; i--) { const j = (rng() * (i + 1)) | 0; const x = perm[i]; perm[i] = perm[j]; perm[j] = x; }
+  const np = n >> 1;
+  for (let k = 0; k < 2 * np; k++) pairs[k] = perm[k];
+  return np;
+}
+
+/* 2D grid: each program (random order) picks one neighbour within distance 2;
+   the pair forms only if both are still free (as in cubff's interaction pattern). */
+function pairGrid(w, h, rng, perm, used, pairs) {
+  const n = w * h;
+  for (let i = 0; i < n; i++) { perm[i] = i; used[i] = 0; }
+  for (let i = n - 1; i > 0; i--) { const j = (rng() * (i + 1)) | 0; const x = perm[i]; perm[i] = perm[j]; perm[j] = x; }
+  let np = 0;
+  for (let k = 0; k < n; k++) {
+    const i = perm[k];
+    const x = i % w, y = (i / w) | 0;
+    const x0 = Math.max(0, x - 2), x1 = Math.min(w - 1, x + 2), y0 = Math.max(0, y - 2), y1 = Math.min(h - 1, y + 2);
+    const cnt = (x1 - x0 + 1) * (y1 - y0 + 1) - 1;
+    const rw = x1 - x0 + 1;
+    let idx = (rng() * cnt) | 0;
+    const selfIdx = (y - y0) * rw + (x - x0);
+    if (idx >= selfIdx) idx++;
+    const j = (y0 + ((idx / rw) | 0)) * w + (x0 + (idx % rw));
+    if (used[i] || used[j]) continue;
+    used[i] = used[j] = 1;
+    pairs[2 * np] = i; pairs[2 * np + 1] = j; np++;
+  }
+  return np;
+}
+
+function packPairs(soup, pairs, start, end, buf) {
+  let o = 0;
+  for (let k = start; k < end; k++) {
+    const a = pairs[2 * k] * 64, b = pairs[2 * k + 1] * 64;
+    buf.set(soup.subarray(a, a + 64), o); buf.set(soup.subarray(b, b + 64), o + 64); o += 128;
+  }
+}
+function unpackPairs(soup, pairs, start, end, buf) {
+  let o = 0;
+  for (let k = start; k < end; k++) {
+    const a = pairs[2 * k] * 64, b = pairs[2 * k + 1] * 64;
+    soup.set(buf.subarray(o, o + 64), a); soup.set(buf.subarray(o + 64, o + 128), b); o += 128;
+  }
+}
+/* ===== end core ===== */
+</script>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const MAX_STEPS = 8192;
+
+  /* 128 programs sampled from a soup in which replicators had already emerged
+     (cubff bff_noheads, 131,072 programs, seed 0, epoch 3,200). Used only by "Inoculate". */
+  const EVOLVED = Uint8Array.from(atob("ev//WzwsJGAsI8Hg3WA0JH3HfF0u//8utM//////ov8OefFJtGhl0np6faM8U118x30kNGDd4Fgj4GD/LDxb/BZbPCwkYOAjWOBwYDQkfcd8YlMu//8utM/////8ov8sefFJtGhl0np6faM88l18x30kKGDd5Fgj4GAkLDxbJMlbPCwkYOB/WODdYDQkfcd8XVM8oy7//y60z/////+i/yx58Um0aGXSevfXozwXXXzHfSQ0YN3gWCNhYCQsPFvsusZbPCwkYOAjWODdYDQkfcd8XS7//x+0z/////+iXix58Um0aGXSenpzozxTXXzHfSQ0YN3gWCPgYKIsPFtfAwAAAAAAoaGhOwChvr48AFsAUCb/O///LHnxB7RoZdJ6en2jPIJddzyjfQAsWz16B/8yHgfjPAeQAABbAFsAAFzXeGBgYCRgels8LP+k4CN64N0nLv//LrTP/////6L/LHnxSbRoZdJ6en1cXFNdfMd9JDRg3eBYP+BgJCw8W1xbIf9AYCwkW1s8LCRg4CNY4N1gNCR9x/+07rTPUf3//6L/5XnxSbQsZdKHfXp9I+CGx3zHfcw0YN3gWCPgYCQsLCyDZZubyFskW1s8LCRg4CFY4N1gNCR9x3xdPamjfXrL0mVotMGZeSz/z//////P/y7//y4kLDxb1oBlJP9bIu6WW1s8LCRg4CNY4N1gNCR9x3xdUyejo3p90npLZUm0efF5LP+i///P/y60//88IV18x30kNGBB4Fgj4GAkLDxbWzwsJPXgI1jg3WA0JH3HfF3MPKN9enrSZWi0SfF5LP+i/9f//8+01v//LrU8U118x30kNGDd4Fgj4GAkLDxbev8AACwALAD/4gD+vr48AFsArib/O///LHnxB7RoZdJ6en2jPEFddzyjfQAsW/S/B/8yHgfjPAf//f0A/QD9AP/9W1zDPCwkYOA/WODdYDQkfcd8XVNcXH16etJlaLRJ13ksh6L/K///z7Qu//8uYN2jeiPgpP8sPFt6JFvPenhgtFs8LP5g4COM/t1gNCR9x3xdLv//LrTP/////wn/LHnxSbRkZRl6en2jCVNdfMd9zDRg3eBYIy7SJCw80ltbYQ1bXFs8LCRg4D9Y4N1gDCR9dnxdU1xcfXp60mVotEnxeSz/f//////PtC7//y5g3Xd6I1qk/yw8W3okW89613pbPCwk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"), c => c.charCodeAt(0));
+
+  /* ---------- byte colours ---------- */
+  const OPINFO = [
+    [60, '<', '#3b82f6', 'move head 0 left'],
+    [62, '>', '#7fb2ff', 'move head 0 right'],
+    [123, '{', '#8b5cf6', 'move head 1 left'],
+    [125, '}', '#b9a0ff', 'move head 1 right'],
+    [43, '+', '#f59e0b', 'add 1 to the byte at head 0'],
+    [45, '-', '#f97316', 'subtract 1 from the byte at head 0'],
+    [46, '.', '#10b981', 'copy byte at head 0 to head 1'],
+    [44, ',', '#5eead4', 'copy byte at head 1 to head 0'],
+    [91, '[', '#f43f5e', 'if byte at head 0 is zero, jump past matching ]'],
+    [93, ']', '#fb8fa3', 'if byte at head 0 is not zero, jump back to matching ['],
+  ];
+  const ZERO_COLOR = '#56657c';
+  const hexToRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const RGB = new Array(256);
+  for (let b = 0; b < 256; b++) { const v = 18 + Math.round(b / 255 * 22); RGB[b] = [v, v + 2, v + 6]; }
+  RGB[0] = hexToRgb(ZERO_COLOR);
+  for (const [b, , col] of OPINFO) RGB[b] = hexToRgb(col);
+  const PAL = new Uint32Array(256);
+  for (let b = 0; b < 256; b++) { const [r, g, bl] = RGB[b]; PAL[b] = (255 << 24) | (bl << 16) | (g << 8) | r; }
+  const cssOf = b => `rgb(${RGB[b].join(',')})`;
+  const charOf = b => BFF_OP[b] ? String.fromCharCode(b) : (b === 0 ? '0' : '·');
+
+  // reference card
+  $('opsList').innerHTML = OPINFO.map(([b, ch, col, txt]) =>
+    `<div class="op"><span class="sw" style="background:${col}">${ch.replace('<', '&lt;').replace('>', '&gt;')}</span><span>${txt}</span></div>`).join('') +
+    `<div class="op"><span class="sw" style="background:${ZERO_COLOR}">0</span><span>the zero byte (data)</span></div>` +
+    `<div class="op"><span class="sw" style="background:rgb(30,32,36);color:#8d97a8">·</span><span>any other byte: data, a no-op when run</span></div>`;
+
+  /* ---------- state ---------- */
+  const S = {
+    mode: 'mixed', w: 128, h: 128, n: 16384, seed: 1, mut: 1 / 4096,
+    soup: null, rng: null, perm: null, used: null, pairs: null, mainBuf: null,
+    epoch: 0, interactions: 0, running: false, looping: false,
+    lastOps: 0, opsAcc: 0, opsCnt: 0, hist: [], lastHoe: null, topShare: null,
+    transition: null, selected: -1, dirty: true, rateTimes: [], species: [],
+  };
+
+  /* ---------- workers ---------- */
+  let pool = [];
+  async function startWorkers() {
+    const n = Math.max(1, Math.min(8, (navigator.hardwareConcurrency || 4) - 1));
+    try {
+      const src = $('core').textContent + `
+        onmessage = (e) => {
+          const { buf, n, maxSteps } = e.data;
+          const t = new Uint8Array(buf);
+          let ops = 0;
+          for (let k = 0; k < n; k++) ops += bffRun(t, k * 128, maxSteps);
+          postMessage({ buf, ops }, [buf]);
+        };`;
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      const made = [];
+      for (let i = 0; i < n; i++) {
+        const wk = new Worker(url);
+        const p = { wk, buf: new ArrayBuffer(128), resolve: null };
+        wk.onmessage = e => { p.buf = e.data.buf; const r = p.resolve; p.resolve = null; r && r(e.data.ops); };
+        made.push(p);
+      }
+      // ping each worker once, with a timeout
+      const ok = await Promise.race([
+        Promise.all(made.map(p => new Promise(res => { p.resolve = res; const b = p.buf; p.wk.postMessage({ buf: b, n: 0, maxSteps: 1 }, [b]); }))).then(() => true),
+        new Promise(res => setTimeout(() => res(false), 3000)),
+      ]);
+      if (!ok) throw new Error('workers did not answer');
+      pool = made;
+      $('threadNote').textContent = `Running on ${n} background thread${n > 1 ? 's' : ''}.`;
+    } catch (err) {
+      pool = [];
+      $('threadNote').textContent = 'Background threads are unavailable here, so the simulation runs on the page itself (slower).';
+    }
+  }
+
+  /* ---------- setup ---------- */
+  const soupCanvas = $('soup');
+  const sctx = soupCanvas.getContext('2d');
+  let img = null, px32 = null;
+
+  function configure() {
+    const [mode, w, h] = $('selSoup').value.split(':');
+    S.mode = mode; S.w = +w; S.h = +h; S.n = S.w * S.h;
+    S.seed = (+$('inSeed').value >>> 0) || 0;
+    S.mut = +$('selMut').value;
+    S.rng = makeRng(S.seed);
+    S.soup = initSoup(S.n, S.rng);
+    S.perm = new Int32Array(S.n); S.used = new Uint8Array(S.n); S.pairs = new Int32Array(S.n);
+    S.mainBuf = new Uint8Array(S.n * 64);
+    S.epoch = 0; S.interactions = 0; S.lastOps = 0; S.opsAcc = 0; S.opsCnt = 0;
+    S.hist = []; S.lastHoe = null; S.topShare = null; S.transition = null; S.species = []; S.rateTimes = [];
+    S.selected = -1; S.inoculatedAt = null; S.pendingEdit = null;
+    soupCanvas.width = S.w * 8; soupCanvas.height = S.h * 8;
+    img = sctx.createImageData(soupCanvas.width, soupCanvas.height);
+    px32 = new Uint32Array(img.data.buffer);
+    $('capLayout').textContent = S.mode === 'grid'
+      ? `${S.w} × ${S.h} grid, ${S.n.toLocaleString()} programs · position matters: programs only meet neighbours`
+      : `${S.n.toLocaleString()} programs, well mixed · position on screen is just a slot number`;
+    $('hint').innerHTML = hintFor();
+    S.dirty = true;
+    renderSpecies(); renderInspector(); updateStats(); drawCharts(); updateStatus();
+  }
+
+  function hintFor() {
+    if (S.mode === 'grid') return 'On the grid, replicators spread outward as waves from wherever they first appear.';
+    if (S.n <= 4096) return 'A small soup runs fast but replicators arise less often; expect a long wait or try other seeds.';
+    if (S.n >= 131072) return 'The paper\'s full size: the most faithful setting, but slower per epoch and each program is under 2 pixels wide.';
+    if (S.n >= 65536) return 'A middle setting: half the paper\'s size, and each program is still visible as a small block.';
+    return 'Fast and easy to watch, but spontaneous replicators are rarer in a soup this size. Try several seeds, or a larger soup.';
+  }
+
+  /* ---------- one epoch ---------- */
+  async function stepEpoch() {
+    if (S.pendingEdit) { const f = S.pendingEdit; S.pendingEdit = null; f(); }
+    mutateSoup(S.soup, S.mut, S.rng);
+    const np = S.mode === 'grid'
+      ? pairGrid(S.w, S.h, S.rng, S.perm, S.used, S.pairs)
+      : pairMixed(S.n, S.rng, S.perm, S.pairs);
+    let ops = 0;
+    if (pool.length) {
+      const per = Math.ceil(np / pool.length);
+      const jobs = [];
+      pool.forEach((p, w) => {
+        const start = w * per, end = Math.min(np, start + per);
+        if (end <= start) return;
+        const bytes = (end - start) * 128;
+        let ab = p.buf;
+        if (ab.byteLength < bytes) ab = new ArrayBuffer(bytes);
+        packPairs(S.soup, S.pairs, start, end, new Uint8Array(ab, 0, bytes));
+        jobs.push(new Promise(res => { p.resolve = res; }).then(o => {
+          unpackPairs(S.soup, S.pairs, start, end, new Uint8Array(p.buf, 0, bytes));
+          ops += o;
+        }));
+        p.wk.postMessage({ buf: ab, n: end - start, maxSteps: MAX_STEPS }, [ab]);
+      });
+      await Promise.all(jobs);
+    } else {
+      packPairs(S.soup, S.pairs, 0, np, S.mainBuf);
+      for (let k = 0; k < np; k++) ops += bffRun(S.mainBuf, k * 128, MAX_STEPS);
+      unpackPairs(S.soup, S.pairs, 0, np, S.mainBuf);
+    }
+    S.epoch++; S.interactions += np;
+    S.lastOps = np ? ops / np : 0;
+    S.opsAcc += ops; S.opsCnt += np;
+    const now = performance.now();
+    S.rateTimes.push(now);
+    while (S.rateTimes.length > 2 && now - S.rateTimes[0] > 2000) S.rateTimes.shift();
+    S.dirty = true;
+  }
+
+  async function runLoop() {
+    if (S.looping) return;
+    S.looping = true;
+    let lastYield = performance.now();
+    try {
+      while (S.running) {
+        await stepEpoch();
+        const now = performance.now();
+        if (!pool.length || now - lastYield > 40) { await new Promise(r => setTimeout(r, 0)); lastYield = performance.now(); }
+      }
+    } finally { S.looping = false; }
+  }
+
+  async function stopAndWait() {
+    S.running = false;
+    while (S.looping || S.stepping) await new Promise(r => setTimeout(r, 10));
+  }
+
+  /* ---------- measurements ---------- */
+  let sampling = false, lastSample = 0;
+  async function sample(force) {
+    if (sampling) return;
+    if (!force && S.opsCnt === 0) return;
+    sampling = true;
+    try {
+      const soup = S.soup.slice();
+      const e = S.epoch;
+      const ops = S.opsCnt ? S.opsAcc / S.opsCnt : S.lastOps;
+      S.opsAcc = 0; S.opsCnt = 0;
+      // Shannon entropy of bytes
+      const cnt = new Float64Array(256);
+      for (let i = 0; i < soup.length; i++) cnt[soup[i]]++;
+      let H = 0;
+      for (let b = 0; b < 256; b++) if (cnt[b]) { const p = cnt[b] / soup.length; H -= p * Math.log2(p); }
+      let hoe = null;
+      if (typeof CompressionStream !== 'undefined') {
+        try {
+          const stream = new Blob([soup]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+          const size = (await new Response(stream).arrayBuffer()).byteLength;
+          hoe = H - size * 8 / soup.length;
+        } catch (_) { hoe = null; }
+      }
+      // exact-copy census
+      const map = new Map();
+      const n = soup.length / 64;
+      for (let i = 0; i < n; i++) {
+        let h1 = 0x811c9dc5, h2 = 0x9747b28c; const o = i * 64;
+        for (let j = 0; j < 64; j++) { const b = soup[o + j]; h1 = Math.imul(h1 ^ b, 16777619); h2 = Math.imul(h2 ^ b, 0x5bd1e995) ^ (h2 >>> 15); }
+        const key = (h1 >>> 0) * 2097152 + ((h2 >>> 0) & 2097151);
+        const v = map.get(key);
+        if (v) v[0]++; else map.set(key, [1, i]);
+      }
+      const top = [...map.values()].filter(v => v[0] > 1).sort((a, b) => b[0] - a[0]).slice(0, 6);
+      S.species = top.map(([c, i]) => ({ count: c, slot: i, bytes: soup.slice(i * 64, i * 64 + 64) }));
+      S.topShare = top.length ? top[0][0] / n : 0;
+      if (e > 0 && e !== (S.hist.length ? S.hist[S.hist.length - 1].e : -1)) {
+        S.hist.push({ e, ops, hoe });
+        if (S.hist.length > 1500) {
+          const h = [];
+          for (let i = 0; i < S.hist.length - 1; i += 2) {
+            const a = S.hist[i], b = S.hist[i + 1];
+            h.push({ e: b.e, ops: (a.ops + b.ops) / 2, hoe: a.hoe == null ? b.hoe : (b.hoe == null ? a.hoe : (a.hoe + b.hoe) / 2) });
+          }
+          if (S.hist.length % 2) h.push(S.hist[S.hist.length - 1]);
+          S.hist = h;
+        }
+      }
+      S.lastHoe = hoe;
+      S.lastSampleOps = ops;
+      if (S.transition == null && e > 0 && ops > 1000) S.transition = e;
+      renderSpecies(); updateStatus(); drawCharts();
+    } finally { sampling = false; }
+  }
+
+  /* ---------- rendering ---------- */
+  function drawSoup() {
+    const soup = S.soup, cols = S.w, W = cols * 8, n = S.n;
+    for (let i = 0; i < n; i++) {
+      const base = ((i / cols) | 0) * 8 * W + (i % cols) * 8;
+      let o = i * 64;
+      for (let r = 0; r < 8; r++) {
+        const row = base + r * W;
+        px32[row] = PAL[soup[o]]; px32[row + 1] = PAL[soup[o + 1]]; px32[row + 2] = PAL[soup[o + 2]]; px32[row + 3] = PAL[soup[o + 3]];
+        px32[row + 4] = PAL[soup[o + 4]]; px32[row + 5] = PAL[soup[o + 5]]; px32[row + 6] = PAL[soup[o + 6]]; px32[row + 7] = PAL[soup[o + 7]];
+        o += 8;
+      }
+    }
+    sctx.putImageData(img, 0, 0);
+  }
+
+  const fmtInt = n => n.toLocaleString('en-GB');
+  function fmtBig(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(0) + 'k';
+    return fmtInt(n);
+  }
+
+  function updateStats() {
+    $('sEpoch').textContent = fmtInt(S.epoch);
+    $('sInter').textContent = fmtBig(S.interactions);
+    const rt = S.rateTimes;
+    $('sRate').textContent = S.running && rt.length > 1 ? ((rt.length - 1) / ((rt[rt.length - 1] - rt[0]) / 1000)).toFixed(1) : '–';
+    $('sOps').textContent = S.epoch ? fmtInt(Math.round(S.lastOps)) : '–';
+    $('sHoe').textContent = S.lastHoe == null ? '–' : Math.max(0, S.lastHoe).toFixed(2);
+    $('sTop').textContent = S.topShare == null ? '–' : (S.topShare * 100).toFixed(S.topShare < 0.01 ? 2 : 1) + '%';
+  }
+
+  function updateStatus() {
+    const st = $('status');
+    st.classList.toggle('running', S.running);
+    st.classList.toggle('alive', S.transition != null);
+    const ino = S.inoculatedAt != null;
+    $('statusText').textContent = S.transition != null
+      ? `Replicators took over near epoch ${fmtInt(S.transition)}${ino ? ' (inoculated)' : ''}`
+      : ino ? `Inoculated at epoch ${fmtInt(S.inoculatedAt)}${S.running ? ', running' : ''}`
+      : (S.running ? 'Pre-life soup, running' : (S.epoch ? 'Pre-life soup, paused' : 'Pre-life soup'));
+    $('btnRun').textContent = S.running ? 'Pause' : (S.epoch ? 'Resume' : 'Run');
+    $('btnStep').disabled = S.running;
+  }
+
+  /* charts */
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function prepCanvas(c) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth || 300, h = c.clientHeight || 96;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function drawTrace(canvas, key, color, yMap, ticks, fmtTick) {
+    const { ctx, w, h } = prepCanvas(canvas);
+    const muted = cssVar('--muted'), line = cssVar('--line');
+    const padL = 34, padR = 6, padT = 6, padB = 16;
+    const pw = w - padL - padR, ph = h - padT - padB;
+    const maxE = Math.max(100, S.epoch);
+    const X = e => padL + e / maxE * pw;
+    const Y = v => padT + (1 - yMap(v)) * ph;
+    ctx.font = '10px ' + cssVar('--font-mono');
+    ctx.lineWidth = 1;
+    for (const t of ticks) {
+      const y = Math.round(Y(t)) + .5;
+      ctx.strokeStyle = line; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(fmtTick(t), padL - 5, y);
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = muted;
+    ctx.fillText('0', padL, h - 3);
+    ctx.textAlign = 'right'; ctx.fillText(fmtInt(maxE), w - padR, h - 3);
+    if (S.transition != null) {
+      const x = Math.round(X(S.transition)) + .5;
+      ctx.strokeStyle = color; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + ph); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const pts = S.hist.filter(p => p[key] != null);
+    if (!pts.length) return;
+    ctx.beginPath();
+    pts.forEach((p, i) => { const x = X(p.e), y = Y(p[key]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.lineTo(X(pts[pts.length - 1].e), padT + ph); ctx.lineTo(X(pts[0].e), padT + ph); ctx.closePath();
+    ctx.globalAlpha = .12; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1;
+    const last = pts[pts.length - 1];
+    ctx.beginPath(); ctx.arc(X(last.e), Y(last[key]), 3, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  }
+  function drawCharts() {
+    const hoeMax = Math.max(1, Math.ceil(Math.max(0, ...S.hist.map(p => p.hoe || 0))));
+    const hoeTicks = hoeMax <= 2 ? [0, 0.5, 1, 1.5, 2].filter(t => t <= hoeMax) : Array.from({ length: hoeMax + 1 }, (_, i) => i).filter(t => hoeMax <= 6 || t % 2 === 0);
+    drawTrace($('chHoe'), 'hoe', cssVar('--trace-hoe'), v => Math.max(0, Math.min(1, v / hoeMax)), hoeTicks, t => String(t));
+    const lg = v => Math.max(0, Math.min(1, Math.log10(Math.max(1, v)) / Math.log10(MAX_STEPS)));
+    drawTrace($('chOps'), 'ops', cssVar('--trace-ops'), lg, [1, 10, 100, 1000, 8192], t => t >= 1000 ? (t / 1000).toFixed(t === 8192 ? 1 : 0) + 'k' : String(t));
+    const last = S.hist[S.hist.length - 1];
+    $('tHoe').textContent = last && last.hoe != null ? Math.max(0, last.hoe).toFixed(2) : '–';
+    $('tOps').textContent = last ? fmtInt(Math.round(last.ops)) : '–';
+    $('traceRange').textContent = `epochs 0 – ${fmtInt(Math.max(100, S.epoch))}`;
+  }
+
+  /* inspector */
+  function progString(bytes) { return Array.from(bytes, charOf).join(''); }
+  function renderInspector() {
+    const marker = $('marker');
+    if (S.selected < 0 || S.selected >= S.n) {
+      marker.hidden = true;
+      $('inspTitle').textContent = 'no program selected';
+      $('inspBody').innerHTML = '<div class="empty">Click any block in the soup, or a row in the list below, to see its 64 bytes. The view follows that slot as the soup changes.</div>';
+      return;
+    }
+    const i = S.selected, col = i % S.w, row = (i / S.w) | 0;
+    marker.hidden = false;
+    Object.assign(marker.style, { left: (col / S.w * 100) + '%', top: (row / S.h * 100) + '%', width: (100 / S.w) + '%', height: (100 / S.h) + '%' });
+    $('inspTitle').textContent = `slot ${fmtInt(i)} · column ${col}, row ${row}`;
+    const bytes = S.soup.subarray(i * 64, i * 64 + 64);
+    const cells = Array.from(bytes, b => {
+      const isOp = BFF_OP[b] !== 0;
+      const ch = charOf(b).replace('<', '&lt;').replace('>', '&gt;');
+      return `<div class="${isOp || b === 0 ? '' : 'noise'}" style="background:${cssOf(b)}" title="byte ${b}">${ch}</div>`;
+    }).join('');
+    const instr = Array.from(bytes).filter(b => BFF_OP[b]).map(b => String.fromCharCode(b)).join('');
+    $('inspBody').innerHTML = `<div class="insp-grid">${cells}</div>
+      <div class="note" style="margin-top:10px">Instructions only (${instr.length} of 64 bytes)</div>
+      <div class="code" id="inspCode"></div>
+      <div class="row-actions" style="margin-top:8px"><button id="btnCopy">Copy bytes as hex</button><button id="btnClear" class="ghost">Close</button></div>`;
+    $('inspCode').textContent = instr || '(none)';
+    $('btnClear').onclick = () => { S.selected = -1; renderInspector(); };
+    $('btnCopy').onclick = async (ev) => {
+      const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      try { await navigator.clipboard.writeText(hex); ev.target.textContent = 'Copied'; }
+      catch (_) { $('inspCode').textContent = hex; const r = document.createRange(); r.selectNodeContents($('inspCode')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); ev.target.textContent = 'Selected, press copy'; }
+    };
+  }
+
+  /* species list */
+  function miniCanvas(bytes) {
+    const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+    const x = c.getContext('2d'); const im = x.createImageData(8, 8); const v = new Uint32Array(im.data.buffer);
+    for (let j = 0; j < 64; j++) v[j] = PAL[bytes[j]];
+    x.putImageData(im, 0, 0); return c;
+  }
+  function renderSpecies() {
+    const ul = $('species');
+    ul.innerHTML = '';
+    if (!S.species.length) {
+      const li = document.createElement('li'); li.className = 'empty'; li.style.cursor = 'default';
+      li.textContent = S.epoch ? 'No program has an exact copy yet. In random soup, every program is unique.' : 'Counted once a second while running.';
+      ul.appendChild(li); return;
+    }
+    for (const sp of S.species) {
+      const li = document.createElement('li'); li.tabIndex = 0;
+      li.appendChild(miniCanvas(sp.bytes));
+      const s = document.createElement('div'); s.className = 's'; s.textContent = progString(sp.bytes); li.appendChild(s);
+      const c = document.createElement('div'); c.className = 'c'; c.textContent = `${fmtInt(sp.count)} · ${(sp.count / S.n * 100).toFixed(sp.count / S.n < 0.01 ? 2 : 1)}%`; li.appendChild(c);
+      const pick = () => { S.selected = sp.slot; renderInspector(); };
+      li.onclick = pick; li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+      ul.appendChild(li);
+    }
+  }
+
+  /* ---------- frame loop ---------- */
+  let lastDraw = 0, drawCost = 0, lastStats = 0;
+  function frame(now) {
+    if (S.dirty && now - lastDraw > Math.max(50, drawCost * 4)) {
+      const t0 = performance.now(); drawSoup(); drawCost = performance.now() - t0; lastDraw = now; S.dirty = false;
+      if (S.selected >= 0) renderInspectorLive();
+    }
+    if (now - lastStats > 200) { updateStats(); lastStats = now; }
+    if (S.running && now - lastSample > 1000) { lastSample = now; sample(false); }
+    requestAnimationFrame(frame);
+  }
+  function renderInspectorLive() {
+    const grid = document.querySelector('.insp-grid');
+    if (!grid) return renderInspector();
+    const bytes = S.soup.subarray(S.selected * 64, S.selected * 64 + 64);
+    const kids = grid.children;
+    for (let j = 0; j < 64; j++) {
+      const b = bytes[j], el = kids[j];
+      if (el.dataset.b === String(b)) continue;
+      el.dataset.b = b; el.style.background = cssOf(b); el.textContent = charOf(b); el.title = 'byte ' + b;
+      el.className = BFF_OP[b] || b === 0 ? '' : 'noise';
+    }
+    const instr = Array.from(bytes).filter(b => BFF_OP[b]).map(b => String.fromCharCode(b)).join('');
+    const code = $('inspCode'); if (code && code.textContent !== instr) code.textContent = instr || '(none)';
+  }
+
+  /* ---------- controls ---------- */
+  $('btnRun').onclick = () => {
+    if (S.running) { S.running = false; updateStatus(); sample(true); return; }
+    S.running = true; S.rateTimes = []; updateStatus(); runLoop();
+  };
+  $('btnStep').onclick = async () => {
+    if (S.running || S.stepping) return;
+    S.stepping = true;
+    try { await stepEpoch(); } finally { S.stepping = false; }
+    sample(true); updateStats();
+  };
+  async function resetSim() {
+    const wasRunning = S.running;
+    await stopAndWait();
+    configure();
+    if (wasRunning) { S.running = true; updateStatus(); runLoop(); }
+  }
+  $('btnReset').onclick = resetSim;
+  $('selSoup').onchange = resetSim;
+  $('inSeed').onchange = resetSim;
+  $('btnDice').onclick = () => { $('inSeed').value = Math.floor(Math.random() * 1e6); resetSim(); };
+  $('selMut').onchange = () => { S.mut = +$('selMut').value; };
+  $('btnPlant').onclick = () => {
+    // Soup edits must happen between epochs, never while workers hold a copy.
+    S.pendingEdit = inoculate;
+    if (!S.looping && !S.stepping) { S.pendingEdit = null; inoculate(); }
+  };
+  function inoculate() {
+    const nLib = EVOLVED.length / 64;
+    const put = i => { const j = Math.floor(Math.random() * nLib) * 64; S.soup.set(EVOLVED.subarray(j, j + 64), i * 64); };
+    let first = -1;
+    if (S.mode === 'grid') {
+      const cx = S.w >> 1, cy = S.h >> 1;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) put((cy + dy) * S.w + cx + dx);
+      first = cy * S.w + cx;
+    } else {
+      const k = Math.max(16, Math.round(S.n * 0.02));
+      for (let c = 0; c < k; c++) { const i = Math.floor(Math.random() * S.n); put(i); if (first < 0) first = i; }
+    }
+    if (S.transition == null) S.inoculatedAt = S.epoch;
+    S.selected = first; S.dirty = true; renderInspector(); updateStatus();
+  }
+
+  soupCanvas.addEventListener('click', e => {
+    const r = soupCanvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - r.left) / r.width * S.w), row = Math.floor((e.clientY - r.top) / r.height * S.h);
+    if (col < 0 || row < 0 || col >= S.w || row >= S.h) return;
+    S.selected = row * S.w + col; renderInspector();
+  });
+
+  window.addEventListener('resize', () => drawCharts());
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => drawCharts());
+  new MutationObserver(() => drawCharts()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // initial state
+  $('selSoup').value = 'mixed:256:256';
+  configure();
+  requestAnimationFrame(frame);
+  startWorkers();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,12 @@
+BFF Primordial Soup
+Copyright 2026 Alexander Baker
+
+This project reimplements the BFF ("bff_noheads") language and soup dynamics from
+cubff (https://github.com/paradigms-of-intelligence/cubff), Copyright Google LLC,
+licensed under the Apache License, Version 2.0.
+
+The evolved programs embedded in index.html (constant EVOLVED) were sampled from a
+soup produced by running cubff.
+
+Reference: B. Agüera y Arcas et al., "Computational Life: How Well-formed,
+Self-replicating Programs Emerge from Simple Interaction", arXiv:2406.19108 (2024).
